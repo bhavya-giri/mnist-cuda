@@ -63,15 +63,23 @@ typedef struct {
 void load_data(const char *filename, float *data, int size) {
     FILE *f = fopen(filename, "rb");
     if (!f) { perror("fopen data"); exit(EXIT_FAILURE); }
-    fread(data, sizeof(float), size, f);
+    size_t n = fread(data, sizeof(float), (size_t)size, f);
     fclose(f);
+    if (n != (size_t)size) {
+        fprintf(stderr, "Error: expected %d floats from %s, read %zu\n", size, filename, n);
+        exit(EXIT_FAILURE);
+    }
 }
 
 void load_labels(const char *filename, int *labels, int size) {
     FILE *f = fopen(filename, "rb");
     if (!f) { perror("fopen labels"); exit(EXIT_FAILURE); }
-    fread(labels, sizeof(int), size, f);
+    size_t n = fread(labels, sizeof(int), (size_t)size, f);
     fclose(f);
+    if (n != (size_t)size) {
+        fprintf(stderr, "Error: expected %d labels from %s, read %zu\n", size, filename, n);
+        exit(EXIT_FAILURE);
+    }
 }
 
 void normalize_data(float *data, int size) {
@@ -287,6 +295,10 @@ void update_weights_only(NeuralNetworkCUDA *nn, float lr) {
                            &neg_lr, nn->d_grad_bias1, 1, nn->d_bias1, 1));
     CUBLAS_CHECK(cublasSaxpy(nn->cublas_handle, OUTPUT_SIZE,
                            &neg_lr, nn->d_grad_bias2, 1, nn->d_bias2, 1));
+
+    CUDA_CHECK(cudaDeviceSynchronize());
+}
+
 // GPU-side loss computation function
 // Returns average loss after computing softmax, cross-entropy, and gradients on GPU
 float compute_loss_on_gpu(NeuralNetworkCUDA *nn, int batch_size) {
